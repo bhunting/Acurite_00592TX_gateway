@@ -124,31 +124,33 @@
  * units, set the addresses to 0,1,3,5... to configure all nodes as children to each other. If using many nodes,
  * it is easiest just to increment the NODE_ADDRESS by 1 as the sketch is uploaded to each device.
  */
+ 
+ // Include various headers for the nRF24L01 radio, SPI to interface with the display and nRF24L01 radio, and the OLED character formatting
 #define SERIAL_DEBUG
 #include <avr/pgmspace.h>
-#include <RF24Network.h>
-#include <RF24.h>
-#include <SPI.h>
+#include <RF24Network.h>	// nRF24L01 radio support
+#include <RF24.h>			// nRF24L01 radio support
+#include <SPI.h>			// SPI interface to radio and display
 #include "printf.h"
-#include <U8x8lib.h>
+#include <U8x8lib.h>		// character formatting for display
+#include <Arduino.h>		// standard Arduino library
 
-
-//--------------------------------------------------------------
-//-------- Data & Defines for Acurite Probe sniffing -----------
-//--------------------------------------------------------------
-// ring buffer size has to be large enough to fit
-// data and sync signal, at least 120
-// round up to 128 for now
+//--------------------------------------------------------------------------
+//-------- Data & Defines for Acurite Temperature Probe sniffing -----------
+//--------------------------------------------------------------------------
+// ring buffer size has to be large enough to fit data and sync signal,
+//  at least 120 bytes, round up to 128 for now
 #define RING_BUFFER_SIZE  128
 
-#define SYNC_HIGH       600
-#define SYNC_LOW        600
-#define PULSE_LONG      400
-#define PULSE_SHORT     220
-#define BIT1_HIGH       PULSE_LONG
-#define BIT1_LOW        PULSE_SHORT
-#define BIT0_HIGH       PULSE_SHORT
-#define BIT0_LOW        PULSE_LONG
+// The pulse durations are the measured time in micro seconds between pulse edges.
+#define SYNC_HIGH       600				// sync pulse high time
+#define SYNC_LOW        600				// sync pulse low time
+#define PULSE_LONG      400				// data bit long pulse time
+#define PULSE_SHORT     220				// data bit short pulse time
+#define BIT1_HIGH       PULSE_LONG		// 1 bit high time
+#define BIT1_LOW        PULSE_SHORT		// 1 bit low time
+#define BIT0_HIGH       PULSE_SHORT		// 0 bit high time
+#define BIT0_LOW        PULSE_LONG		// 0 bit low time
 
 // On the arduino connect the data pin, the pin that will be 
 // toggling with the incomming data from the RF module, to
@@ -159,55 +161,51 @@
 // stop the data stream and prevent interrupts between the 
 // data packets if desired.
 //
-#define DATAPIN         (3)             // D3 is interrupt 1
-#define SQUELCHPIN      (4)
+#define DATAPIN         (3)             // D3 is interrupt 1 (board layout specific)
+#define SQUELCHPIN      (4)				// D4 is used to squelch data from 433 MHz radio
 #define SYNCPULSECNT    (4)             // 4 pulses (8 edges)
 #define SYNCPULSEEDGES  (SYNCPULSECNT*2)
 #define DATABYTESCNT    (7)             // 7 bytes in the total data returned
 #define DATABITSCNT     (DATABYTESCNT*8)// 7 bytes * 8 bits
 #define DATABITSEDGES   (DATABITSCNT*2)
 
-// The pulse durations are the measured time in micro seconds between
-// pulse edges.
-//#include <stdint.h>
-#include <Arduino.h>
-
+// The pulse durations are the measured time in micro seconds between pulse edges.
 unsigned long pulseDurations[RING_BUFFER_SIZE];
-unsigned int syncIndex  = 0;    // index of the last bit time of the sync signal
-unsigned int dataIndex  = 0;    // index of the first bit time of the data bits (syncIndex+1)
-bool         syncFound = false; // true if sync pulses found
-bool         received  = false; // true if sync plus enough bits found
-unsigned int changeCount = 0;
+unsigned int syncIndex  	= 0;    	// index of the last bit time of the sync signal
+unsigned int dataIndex  	= 0;    	// index of the first bit time of the data bits (syncIndex+1)
+bool         syncFound 		= false; 	// true if sync pulses found
+bool         received  		= false; 	// true if sync plus enough bits found
+unsigned int changeCount 	= 0;		// count edges of data
+const byte   interruptPin 	= 3;
 
-const byte   interruptPin = 3;
-
-//------------- PrintHex8() ------------------------------------------
-/*
+/*-------------------------------------------------------------------
+ * ------------- PrintHex8() ----------------------------------------
  * helper code to print formatted hex 
+ * prints 8-bit data in hex
  */
-void PrintHex8(uint8_t *data, uint8_t length) // prints 8-bit data in hex
+void PrintHex8(uint8_t *data, uint8_t length)
 {
- char tmp[length*2+1];
- byte first;
- int j = 0;
- for (uint8_t i = 0; i < length; i++) 
- {
-   first = (data[i] >> 4) | 48;
-   if (first > 57) tmp[j] = first + (byte)39;
-   else tmp[j] = first ;
-   j++;
+	char tmp[length*2+1];
+	byte first;
+	int j = 0;
+	for (uint8_t i = 0; i < length; i++) 
+	{
+		first = (data[i] >> 4) | 48;
+		if (first > 57) tmp[j] = first + (byte)39;
+		else tmp[j] = first ;
+		j++;
 
-   first = (data[i] & 0x0F) | 48;
-   if (first > 57) tmp[j] = first + (byte)39; 
-   else tmp[j] = first;
-   j++;
- }
- tmp[length*2] = 0;
- Serial.print(tmp);
+		first = (data[i] & 0x0F) | 48;
+		if (first > 57) tmp[j] = first + (byte)39; 
+		else tmp[j] = first;
+		j++;
+	}
+	tmp[length*2] = 0;
+	Serial.print(tmp);
 }
 
-//------------------ isSync() ----------------------------------------
-/*
+/*-------------------------------------------------------------------
+ * ------------------ isSync() --------------------------------------
  * Look for the sync pulse train, 4 high-low pulses of
  * 600 uS high and 600 uS low.
  * idx is index of last captured bit duration.
