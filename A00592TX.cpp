@@ -94,12 +94,12 @@
 
  // The pulse durations are the measured time in micro seconds between pulse edges.
 static unsigned long pulseDurations[RING_BUFFER_SIZE];
-static unsigned int syncIndex  	= 0;    	// index of the last bit time of the sync signal
-static unsigned int dataIndex  	= 0;    	// index of the first bit time of the data bits (syncIndex+1)
-static bool         syncFound 		= false; 	// true if sync pulses found
-static bool         received  		= false; 	// true if sync plus enough bits found
-static unsigned int changeCount 	= 0;		// count edges of data
-static const byte   interruptPin 	= 3;
+static unsigned int syncIndex       = 0;        // index of the last bit time of the sync signal
+static unsigned int dataIndex       = 0;        // index of the first bit time of the data bits (syncIndex+1)
+static bool         syncFound       = false;    // true if sync pulses found
+static bool         received        = false;    // true if sync plus enough bits found
+static unsigned int changeCount     = 0;        // count edges of data
+static const byte   interruptPin    = 3;
 
 
 
@@ -147,23 +147,23 @@ static uint8_t CRC = 0;
  */
 void PrintHex8(uint8_t *data, uint8_t length)
 {
-	char tmp[length*2+1];
-	byte first;
-	int j = 0;
-	for (uint8_t i = 0; i < length; i++) 
-	{
-		first = (data[i] >> 4) | 48;
-		if (first > 57) tmp[j] = first + (byte)39;
-		else tmp[j] = first ;
-		j++;
+    char tmp[length*2+1];
+    byte first;
+    int j = 0;
+    for (uint8_t i = 0; i < length; i++) 
+    {
+        first = (data[i] >> 4) | 48;
+        if (first > 57) tmp[j] = first + (byte)39;
+        else tmp[j] = first ;
+        j++;
 
-		first = (data[i] & 0x0F) | 48;
-		if (first > 57) tmp[j] = first + (byte)39; 
-		else tmp[j] = first;
-		j++;
-	}
-	tmp[length*2] = 0;
-	Serial.print(tmp);
+        first = (data[i] & 0x0F) | 48;
+        if (first > 57) tmp[j] = first + (byte)39; 
+        else tmp[j] = first;
+        j++;
+    }
+    tmp[length*2] = 0;
+    Serial.print(tmp);
 }
 
 /*-------------------------------------------------------------------
@@ -209,7 +209,7 @@ static void handler_rf433()
    static unsigned int bitState  = 0;
 
    bitState = digitalRead(DATAPIN);
-   digitalWrite(13, bitState);
+   //digitalWrite(13, bitState); // toggle Arduino pin 13 which is typically the LED pin
 
    // ignore if we haven't finished processing the previous 
    // received signal in the main loop.
@@ -266,27 +266,12 @@ static void handler_rf433()
       else
       {
          received = true;
+		 // disable interrupt to avoid new data corrupting the buffer
+         detachInterrupt(digitalPinToInterrupt(interruptPin));
       }
    }
 }
 
-//---------------- setup() -------------------------------------------
-void setup592()
-{
-   pinMode(DATAPIN, INPUT);             // data interrupt input
-   attachInterrupt(digitalPinToInterrupt(interruptPin), handler_rf433, CHANGE);
-   pinMode(SQUELCHPIN, OUTPUT);         // data squelch pin on radio module
-   digitalWrite(SQUELCHPIN, HIGH);      // UN-squelch data
-
-   memset( sensorData, 0, sizeof(sensorData));
-  // pre-fill various values into the data structure.
-  for(uint8_t i = 0; i < _numSensors; i++)
-  {
-    sensorData[i].id = i+1;
-  }
-}
-
-/***********************************************************************/
 //---------------- convertTimingToBit() -------------------------------
 /*
  * Convert pulse durations to bits.
@@ -307,8 +292,25 @@ int convertTimingToBit(unsigned int t0, unsigned int t1)
    return -1;  // undefined
 }
 
+/***********************************************************************/
 //#define PRINT_DATA_ARRAY
-#define PRINT_NEW_DATA
+// #define PRINT_NEW_DATA
+
+//---------------- setup() -------------------------------------------
+void setup592()
+{
+   pinMode(DATAPIN, INPUT);             // data interrupt input
+   attachInterrupt(digitalPinToInterrupt(interruptPin), handler_rf433, CHANGE);
+   pinMode(SQUELCHPIN, OUTPUT);         // data squelch pin on radio module
+   digitalWrite(SQUELCHPIN, HIGH);      // UN-squelch data
+
+   memset( sensorData, 0, sizeof(sensorData));
+  // pre-fill various values into the data structure.
+  for(uint8_t i = 0; i < _numSensors; i++)
+  {
+    sensorData[i].id = i+1;
+  }
+}
 
 /***********************************************************************/
 //-------------------- loop592() ----------------------------------------------
@@ -321,12 +323,8 @@ int convertTimingToBit(unsigned int t0, unsigned int t1)
  */
 void loop592()
 {
-
    if( received == true )
    {
-      // disable interrupt to avoid new data corrupting the buffer
-      detachInterrupt(digitalPinToInterrupt(interruptPin));
-
       // convert bits to bytes
       unsigned int startIndex, stopIndex, ringIndex;
       uint8_t dataBytes[DATABYTESCNT];
@@ -466,11 +464,3 @@ void loop592()
       attachInterrupt(digitalPinToInterrupt(interruptPin), handler_rf433, CHANGE);
    } // new data received
 } // loop592
-
-
-
-
-
- 
- 
- 

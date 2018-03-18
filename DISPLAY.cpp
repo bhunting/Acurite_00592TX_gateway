@@ -1,6 +1,4 @@
 
-
-
 #include "DISPLAY.h"
 #include "A00592TX.h"
 
@@ -13,15 +11,20 @@ static U8X8_SSD1306_128X64_NONAME_4W_HW_SPI u8x8(/* cs=*/ 7, /* dc=*/ 8, /* rese
 /***********************************************************************/
 void setupU8X8(void)
 {
-	/* U8g2 Project: SSD1306 Test Board */
-	u8x8.begin();
-	u8x8.setPowerSave(0);
+    pinMode(7, OUTPUT);     // OLED CS
+    digitalWrite(7, HIGH);  // de-select OLED CS
+    pinMode(8, OUTPUT);     // OLED DC
+    digitalWrite(8, HIGH);  // set OLED DC
+    
+    /* U8g2 Project: SSD1306 Test Board */
+    u8x8.begin();
+    u8x8.setPowerSave(0);
 }
 
 /***********************************************************************/
 void display_sensordata_U8X8(void)
 {
-  char buffer[128/8+1];
+  char buffer[128/8+1];  // 128 pixels across / 8 pixels per character plus a trailing null
   int i = 0;
 
   for( i = 0; i < _numSensors; i++ )

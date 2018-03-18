@@ -18,12 +18,6 @@ void setup()
 {
 	Serial.begin(115200);
 
-	pinMode(7, OUTPUT);     // OLED CS
-	digitalWrite(7, HIGH);  // de-select OLED CS
-
-	pinMode(8, OUTPUT);     // OLED DC
-	digitalWrite(8, HIGH);  // set OLED DC
-
 	SPI.begin();                                           // Bring up the RF network
 	setupU8X8();
 	setupNRF();
