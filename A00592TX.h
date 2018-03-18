@@ -98,7 +98,7 @@ const uint8_t SENSOR_DATA_FRESH_MASK  = 0x40;
 const uint8_t SENSOR_DATA_FRESH_VAL   = 0x40;
 const uint8_t SENSOR_DATA_STALE_VAL   = 0x00;
 
-const uint32_t SENSOR_STALE_DATA_TIMEOUT = 180; // seconds
+const uint32_t SENSOR_STALE_DATA_TIMEOUT = 50; // seconds
 
 extern struct sensorTemperatureData sensorData[ _numSensors ];
 

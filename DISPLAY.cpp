@@ -65,7 +65,13 @@ void display_sensordata_U8X8(void)
     int write_rows = min( 48/8, _numSensors);
     for( i = 0; i < write_rows; i++ )
     {
-        sprintf(buffer, "%1d %1X %3d %7d", 
+        uint16_t lowtime = sensorData[i].timestamp & 0xFFFF; // truncate timestamp to lower 5 decimal digits
+                                                             // Max display 0xFFFF = 65535, then roll to zero
+                                                             // This keeps the timestamp to 5 decimal digits
+        // 128 wide display handles up to 16 8x8 characters
+        // 1234567890123456
+        // D XX TTT   TTTTT
+        sprintf(buffer, "%1d %02X %3d   %5d", 
                     sensorData[i].id,
                     sensorData[i].status,
                     sensorData[i].temperature,
