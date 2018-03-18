@@ -54,20 +54,20 @@ uint8_t NODE_ADDRESS = 1;  // Use numbers 0 through to select an address from th
 
 /***********************************************************************/
 /***********************************************************************/
-static RF24 radio(9,10);                              // CE & CS pins to use (Using 7,8 on Uno,Nano)
+static RF24 radio(9,10);                            // CE & CS pins to use (Using 7,8 on Uno,Nano)
 static RF24Network network(radio); 
 
-uint16_t this_node;                           // Our node address
+uint16_t this_node;                                 // Our node address
 
-static const unsigned long interval = 1000; // ms       // Delay manager to send pings regularly.
-static unsigned long last_time_sent;
+static const unsigned long interval = 1000;         // ms       
+static unsigned long last_time_sent;                // Delay manager to send pings regularly.
 
-static const short max_active_nodes = 10;            // Array of nodes we are aware of
+static const short max_active_nodes = 10;           // Array of nodes we are aware of
 static uint16_t active_nodes[max_active_nodes];
 static short num_active_nodes = 0;
 static short next_ping_node_index = 0;
 
-static bool send_T(uint16_t to);                      // Prototypes for functions to send & handle messages
+static bool send_T(uint16_t to);                    // Prototypes for functions to send & handle messages
 static bool send_N(uint16_t to);
 static void handle_T(RF24NetworkHeader& header);
 static void handle_N(RF24NetworkHeader& header);

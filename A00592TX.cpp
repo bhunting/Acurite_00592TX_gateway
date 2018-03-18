@@ -292,6 +292,23 @@ int convertTimingToBit(unsigned int t0, unsigned int t1)
    return -1;  // undefined
 }
 
+//---------------- ageStaleData() -------------------------------
+/*
+ * Mark data that is more than N seconds old as NOT FRESH
+ */
+void ageStaleData() 
+{
+    // compare timestamp of data to stale timeout
+    int i = 0;
+    for( i = 0; i < _numSensors; i++ )
+    {
+        if( (sensorData[i].timestamp + SENSOR_STALE_DATA_TIMEOUT) < (millis() / 1000) )
+        {
+            sensorData[i].status &= ~SENSOR_DATA_FRESH_MASK;
+        }
+    }
+}
+
 /***********************************************************************/
 //#define PRINT_DATA_ARRAY
 // #define PRINT_NEW_DATA
@@ -408,14 +425,17 @@ void loop592()
       sensorData[id].id = id+1;
       
       // check for a low battery indication
-      if( (acurite_data->status & BATTERY_LOW_MASK) == BATTERY_LOW_VAL )
+      if( (acurite_data->status & SENSOR_BATTERY_LOW_MASK) == SENSOR_BATTERY_LOW_VAL )
       {
-         sensorData[id].status |= BATTERY_LOW;
+         sensorData[id].status |= SENSOR_BATTERY_LOW;
       }
       else
       {
-        sensorData[id].status &= ~BATTERY_LOW;
+        sensorData[id].status &= ~SENSOR_BATTERY_LOW;
       }
+      
+      // set sensor data as fresh
+      sensorData[id].status |= (SENSOR_DATA_FRESH_VAL & SENSOR_DATA_FRESH_MASK);
 
       // extract temperature value
       uint16_t temperature = 0;
@@ -428,6 +448,8 @@ void loop592()
       temperature += (acurite_data->temperature_low) & 0x7F;
       // temperature is offset by 1024 (= 0x400 = b0100 0000 0000)
       sensorData[id].temperature = (uint16_t)((temperature-1024)+0.5);
+      
+      // update timestamp of new data
       sensorData[id].timestamp = millis() / 1000;  // convert milli-seconds into seconds
       
       
@@ -463,4 +485,5 @@ void loop592()
       // re-enable interrupt
       attachInterrupt(digitalPinToInterrupt(interruptPin), handler_rf433, CHANGE);
    } // new data received
+   ageStaleData(); // flag data that has not been refhreshed recently
 } // loop592

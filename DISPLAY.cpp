@@ -22,21 +22,57 @@ void setupU8X8(void)
 }
 
 /***********************************************************************/
+void display_sensorstatus_U8X8(void)
+{
+    char buffer[128/8+1];  // 128 pixels across / 8 pixels per character plus a trailing null
+    // OLED 1306 display is 128 wide by 64 pixels tall. Using 8x8 characters allows
+    // 16 character spaces across and 8 characters tall.
+    // The top 16 pixels are yellow masked, the lower 48 are blue masked.
+    // Using the yellow mask area for status and writing to the 48 blue
+    // pixels allows for 6 rows of 8 pixel tall characters.
+
+    u8x8.setFont(u8x8_font_chroma48medium8_r);
+    int i = 0;
+    for( i = 0; i < _numSensors; i++ )
+    {
+        if( (sensorData[i].status & SENSOR_DATA_FRESH_MASK) == SENSOR_DATA_FRESH_VAL )
+        {
+            u8x8.setInverseFont(true);
+            buffer[0] = '1'+i;
+        }
+        else
+        {
+            u8x8.setInverseFont(false);
+            buffer[0] = ' ';
+        }
+        buffer[1] = 0;      // trailing null 
+        u8x8.drawString(i,0,buffer);
+    }
+    u8x8.setInverseFont(false);
+}
+
+/***********************************************************************/
 void display_sensordata_U8X8(void)
 {
-  char buffer[128/8+1];  // 128 pixels across / 8 pixels per character plus a trailing null
-  int i = 0;
+    char buffer[128/8+1];  // 128 pixels across / 8 pixels per character plus a trailing null
+    // OLED 1306 display is 128 wide by 64 pixels tall. Using 8x8 characters allows
+    // 16 character spaces across and 8 characters tall.
+    // The top 16 pixels are yellow masked, the lower 48 are blue masked.
+    // Using the yellow mask area for status and writing to the 48 blue
+    // pixels allows for 6 rows of 8 pixel tall characters.
+    int i = 0;
 
-  for( i = 0; i < _numSensors; i++ )
-  {
-    sprintf(buffer, "%1d %1X %3d %7d", 
+    int write_rows = min( 48/8, _numSensors);
+    for( i = 0; i < write_rows; i++ )
+    {
+        sprintf(buffer, "%1d %1X %3d %7d", 
                     sensorData[i].id,
                     sensorData[i].status,
                     sensorData[i].temperature,
                     sensorData[i].timestamp);
-    u8x8.setFont(u8x8_font_chroma48medium8_r);
-    u8x8.drawString(0,i+2,buffer);
-  }
+        u8x8.setFont(u8x8_font_chroma48medium8_r);
+        u8x8.drawString(0,i+2,buffer);
+    }
 }
 
 /***********************************************************************/
@@ -51,7 +87,7 @@ void loopU8X8(void)
     switch( clearSent )
     {
       case 0:
-      u8x8.clearDisplay();
+      //u8x8.clearDisplay();
       clearSent = 1;
       break;
 
@@ -59,6 +95,7 @@ void loopU8X8(void)
       //u8x8.setFont(u8x8_font_chroma48medium8_r);
       //u8x8.drawString(0,0,"Hello World!");
       display_sensordata_U8X8();
+      display_sensorstatus_U8X8();
       clearSent = 0;
       break;
 

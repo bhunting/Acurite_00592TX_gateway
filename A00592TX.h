@@ -70,7 +70,7 @@ typedef struct acurite_00592TX
 typedef struct sensorTemperatureData
 {
     uint8_t     id;             // sensor id (1 - N_sensors)
-    uint8_t     status;         // 0x80 = BATTERY LOW bit
+    uint8_t     status;         // 0x80 = BATTERY LOW bit, 0x40 = Data Fresh bit, 
     uint16_t    temperature;    // temperature value in C, no offset
     uint32_t    timestamp;      // number of seconds since startup
 } sensorTemperatureData;
@@ -88,10 +88,17 @@ const uint16_t SENSORID05 = 0x0604;
 const uint16_t SENSORID06 = 0x386C;
 
 // reduced sensor status
-const uint8_t BATTERY_LOW_MASK = 0xC0;
-const uint8_t BATTERY_LOW_VAL  = 0x80;
-const uint8_t BATTERY_OK_VAL   = 0x40;
-const uint8_t BATTERY_LOW      = 0x80;
+const uint8_t SENSOR_BATTERY_LOW_MASK = 0xC0;
+const uint8_t SENSOR_BATTERY_LOW_VAL  = 0x80;
+const uint8_t SENSOR_BATTERY_OK_VAL   = 0x40;
+const uint8_t SENSOR_BATTERY_LOW      = 0x80;
+
+// reduced sensor status
+const uint8_t SENSOR_DATA_FRESH_MASK  = 0x40;
+const uint8_t SENSOR_DATA_FRESH_VAL   = 0x40;
+const uint8_t SENSOR_DATA_STALE_VAL   = 0x00;
+
+const uint32_t SENSOR_STALE_DATA_TIMEOUT = 180; // seconds
 
 extern struct sensorTemperatureData sensorData[ _numSensors ];
 
