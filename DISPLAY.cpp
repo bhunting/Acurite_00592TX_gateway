@@ -71,7 +71,7 @@ void display_sensordata_U8X8(void)
         // 128 wide display handles up to 16 8x8 characters
         // 1234567890123456
         // D XX TTT   TTTTT
-        sprintf(buffer, "%1d %02X %3d   %5d", 
+        sprintf(buffer, "%1d %02X %3d   %5u", 
                     sensorData[i].id,
                     sensorData[i].status,
                     sensorData[i].temperature,

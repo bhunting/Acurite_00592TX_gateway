@@ -17,6 +17,8 @@
 void setup()
 {
 	Serial.begin(115200);
+    printf_begin();
+    printf_P(PSTR("\n\r A00592TX_GATEWAY \n\r"));
 
 	SPI.begin();                                           // Bring up the RF network
 	setupU8X8();

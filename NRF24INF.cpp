@@ -41,16 +41,12 @@
 /***********************************************************************/
 
 // These are the Octal addresses that will be assigned
-const uint16_t node_address_set[10] = { 00, 02, 05, 012, 015, 022, 025, 032, 035, 045 };
+const uint16_t node_address_set[10] = { 00, 01, 02, 03, 04, 05, 011, 021, 031, 041 };
  
 // 0 = Master
-// 1-2 (02,05)   = Children of Master(00)
-// 3,5 (012,022) = Children of (02)
-// 4,6 (015,025) = Children of (05)
-// 7   (032)     = Child of (02)
-// 8,9 (035,045) = Children of (05)
+// 1-5 (01, 02, 03, 04, 05)   = Children of Master(00)
 
-uint8_t NODE_ADDRESS = 1;  // Use numbers 0 through to select an address from the array
+uint8_t NODE_ADDRESS = 1;  // Use numbers 0 through N to select an address from the array
 
 /***********************************************************************/
 /***********************************************************************/
@@ -67,12 +63,11 @@ static uint16_t active_nodes[max_active_nodes];
 static short num_active_nodes = 0;
 static short next_ping_node_index = 0;
 
-static bool send_T(uint16_t to);                    // Prototypes for functions to send & handle messages
-static bool send_N(uint16_t to);
-static void handle_T(RF24NetworkHeader& header);
-static void handle_N(RF24NetworkHeader& header);
-static void handle_A(RF24NetworkHeader& header);
-static void add_node(uint16_t node);
+// Prototypes for functions to send & handle messages
+static bool send_Status (RF24NetworkHeader& cmdHeader); 
+static bool send_Data   (RF24NetworkHeader& cmdHeader);
+static void handle_A    (RF24NetworkHeader& cmdHeader);
+static void add_node    (uint16_t node);
 
 /***********************************************************************/
 void setupNRF()
@@ -88,143 +83,70 @@ void setupNRF()
 /***********************************************************************/
 void loopNRF()
 {    
-    network.update();                                   // Pump the network regularly
-    while ( network.available() )  {                    // Is there anything ready for us?
-     
-    RF24NetworkHeader header;                           // If so, take a look at it
-    network.peek(header);
+    network.update();                           // Pump the network regularly
+    while ( network.available() )               // Is there anything ready for us?
+    {                    
+        RF24NetworkHeader header;               // If so, take a look at it
+        network.peek(header);
+        switch (header.type)
+        {                             // Dispatch the message to the correct handler.
+            case 'S': send_Status(header); break;
+            case 'D': send_Data(header); break;
+            case 'A': handle_A(header); break;
+            default:  printf_P(PSTR("*** WARNING *** Unknown message type %c\n\r"),header.type);
+                      network.read(header,0,0);
+                      break;
+        };
+    }  
+}
 
+/***********************************************************************/
+/**
+ * Send 'S' message, the current status
+ */
+bool send_Status(RF24NetworkHeader& cmdHeader)
+{
+    printf_P(PSTR("CMD: S : Received from 0%o\n\r"), cmdHeader.from_node);
+    RF24NetworkHeader rspHeader(/*to node*/ cmdHeader.from_node, /*type*/ 'S' /*Status*/);
     
-      switch (header.type){                             // Dispatch the message to the correct handler.
-        case 'T': handle_T(header); break;
-        case 'N': handle_N(header); break;
-        case 'A': handle_A(header); break;
-        default:  printf_P(PSTR("*** WARNING *** Unknown message type %c\n\r"),header.type);
-                  network.read(header,0,0);
-                  break;
-      };
-    }
+    // The 'S' message is status of all sensor nodes
+    uint8_t statusArray[ _numSensors ];
+    network.read(cmdHeader, 0, 0);
 
-  
-  unsigned long now = millis();                         // Send a ping to the next node every 'interval' ms
-  if ( now - last_time_sent >= interval )
-  {
-    last_time_sent = now;
-    uint16_t to = 00;                                   // Who should we send to? By default, send to base
-    if ( num_active_nodes )
-    {                                                   // Or if we have active nodes,
-        to = active_nodes[next_ping_node_index++];      // Send to the next active node
-        if ( next_ping_node_index > num_active_nodes )
-        {                                               // Have we rolled over?
-            next_ping_node_index = 0;                   // Next time start at the beginning
-            to = 00;                                    // This time, send to node 00.
-        }
-    }
-
-    bool ok;
-
-    
-    if ( this_node > 00 || to == 00 )
-    {                    // Normal nodes send a 'T' ping
-        ok = send_T(to);   
-    }else{                                              // Base node sends the current active nodes out
-        ok = send_N(to);
-    }
-    
-    if (ok)
-    {                                                   // Notify us of the result
-        printf_P(PSTR("%lu: APP Send ok\n\r"),millis());
-    }
-    else
+    for( int i = 0; i < _numSensors; i++ )
     {
-        printf_P(PSTR("%lu: APP Send failed\n\r"),millis());
-        last_time_sent -= 100;                           // Try sending at a different time next time
+        statusArray[i] = sensorData[i].status;
     }
-  }
-
-//  delay(50);                          // Delay to allow completion of any serial printing
-//  if(!network.available()){
-//      network.sleepNode(2,0);         // Sleep this node for 2 seconds or a payload is received (interrupt 0 triggered), whichever comes first
-//  }
+    
+    return network.write(rspHeader, statusArray, sizeof(statusArray));
 }
 
 /***********************************************************************/
 /**
- * Send a 'T' message, the current time
+ * Send 'D' message, send data
  */
-bool send_T(uint16_t to)
+bool send_Data(RF24NetworkHeader& cmdHeader)
 {
-    RF24NetworkHeader header(/*to node*/ to, /*type*/ 'T' /*Time*/);
-    // The 'T' message that we send is just a ulong, containing the time
-    unsigned long message = millis();
-    printf_P(PSTR("---------------------------------\n\r"));
-    printf_P(PSTR("%lu: APP Sending %lu to 0%o...\n\r"),millis(),message,to);
-    return network.write(header,&message,sizeof(unsigned long));
-}
-
-/***********************************************************************/
-/**
- * Send an 'N' message, the active node list
- */
-bool send_N(uint16_t to)
-{
-    RF24NetworkHeader header(/*to node*/ to, /*type*/ 'N' /*Time*/);
-    printf_P(PSTR("---------------------------------\n\r"));
-    printf_P(PSTR("%lu: APP Sending active nodes to 0%o...\n\r"),millis(),to);
-    return network.write(header,active_nodes,sizeof(active_nodes));
+    printf_P(PSTR("CMD: D : Received from 0%o\n\r"), cmdHeader.from_node);
+    RF24NetworkHeader rspHeader(/*to node*/ cmdHeader.from_node, /*type*/ 'D' /*Sensor Data*/);
+    
+    // The 'D' message is data from a sensor node
+    uint8_t node_id;
+    network.read(cmdHeader,&node_id,sizeof(node_id));
+    
+    if( (node_id > 0) && (node_id < (_numSensors+1)) )
+    {
+        return network.write(rspHeader, &sensorData[node_id-1], sizeof(sensorTemperatureData));
+    }
 }
 
 /***********************************************************************/
 /**
  * Handle a 'A' message
- * 
  */
-void handle_A(RF24NetworkHeader& header)
+void handle_A(RF24NetworkHeader& cmdHeader)
 {
-    unsigned long message;                         // The 'T' message is just a ulong, containing the time
-    network.read(header,&message,sizeof(unsigned long));
-    printf_P(PSTR("%lu: APP Received %lu from 0%o\n\r"),millis(),message,header.from_node);
-
-    RF24NetworkHeader rspHeader(/*to node*/ header.from_node, /*type*/ 'A' /*Time*/);
-
-    printf_P(PSTR("---------------------------------\n\r"));
-    printf_P(PSTR("ID     0x%X\n\r"), sensorData[0].id);
-    printf_P(PSTR("STATUS 0x%X\n\r"), sensorData[0].status);
-    printf_P(PSTR("TEMP   0x%x\n\r"), sensorData[0].temperature);
-    printf_P(PSTR("TIME   0x%x\n\r"), sensorData[0].timestamp);
-
-    printf_P(PSTR("Sending TEMP to 0%o...\n\r"),header.from_node);
-    network.write(rspHeader,&sensorData[0],sizeof(sensorTemperatureData));
-}
-
-/***********************************************************************/
-/**
- * Handle a 'T' message
- * Add the node to the list of active nodes
- */
-void handle_T(RF24NetworkHeader& header)
-{
-    unsigned long message;                     // The 'T' message is just a ulong, containing the time
-    network.read(header,&message,sizeof(unsigned long));
-    printf_P(PSTR("%lu: APP Received %lu from 0%o\n\r"),millis(),message,header.from_node);
-    if ( header.from_node != this_node || header.from_node > 00 )                                // If this message is from ourselves or the base, don't bother adding it to the active nodes.
-        add_node(header.from_node);
-}
-
-/***********************************************************************/
-/**
- * Handle an 'N' message, the active node list
- */
-void handle_N(RF24NetworkHeader& header)
-{
-    static uint16_t incoming_nodes[max_active_nodes];
-
-    network.read(header,&incoming_nodes,sizeof(incoming_nodes));
-    printf_P(PSTR("%lu: APP Received nodes from 0%o\n\r"),millis(),header.from_node);
-
-    int i = 0;
-    while ( i < max_active_nodes && incoming_nodes[i] > 00 )
-        add_node(incoming_nodes[i++]);
+    printf_P(PSTR("CMD: A : Received from 0%o\n\r"), cmdHeader.from_node);
 }
 
 /***********************************************************************/
