@@ -66,7 +66,6 @@ static short next_ping_node_index = 0;
 // Prototypes for functions to send & handle messages
 static bool send_Status (RF24NetworkHeader& cmdHeader); 
 static bool send_Data   (RF24NetworkHeader& cmdHeader);
-static void handle_A    (RF24NetworkHeader& cmdHeader);
 static void add_node    (uint16_t node);
 
 /***********************************************************************/
@@ -76,8 +75,10 @@ void setupNRF()
     //printf_P(PSTR("\n\rRF24Network/examples/meshping/\n\r"));
     this_node = node_address_set[NODE_ADDRESS];            // Which node are we?
     radio.begin();
-    radio.setPALevel(RF24_PA_HIGH);
-    network.begin(/*channel*/ 100, /*node address*/ this_node );
+    radio.setPALevel(RF24_PA_MAX);
+    radio.setDataRate(RF24_250KBPS);
+    radio.setCRCLength(RF24_CRC_8);    
+    network.begin(/*channel*/ 90, /*node address*/ this_node );
 }
 
 /***********************************************************************/
@@ -85,14 +86,15 @@ void loopNRF()
 {    
     network.update();                           // Pump the network regularly
     while ( network.available() )               // Is there anything ready for us?
-    {                    
+    {                
+        //printf_P(PSTR("\n\r loopNRF network available \n\r"));
+            
         RF24NetworkHeader header;               // If so, take a look at it
         network.peek(header);
         switch (header.type)
         {                             // Dispatch the message to the correct handler.
             case 'S': send_Status(header); break;
             case 'D': send_Data(header); break;
-            case 'A': handle_A(header); break;
             default:  printf_P(PSTR("*** WARNING *** Unknown message type %c\n\r"),header.type);
                       network.read(header,0,0);
                       break;
@@ -138,15 +140,11 @@ bool send_Data(RF24NetworkHeader& cmdHeader)
     {
         return network.write(rspHeader, &sensorData[node_id-1], sizeof(sensorTemperatureData));
     }
-}
-
-/***********************************************************************/
-/**
- * Handle a 'A' message
- */
-void handle_A(RF24NetworkHeader& cmdHeader)
-{
-    printf_P(PSTR("CMD: A : Received from 0%o\n\r"), cmdHeader.from_node);
+    else
+    {
+        rspHeader.type = 'E'; // set message type to E for Error
+        return network.write(rspHeader, 0, 0);
+    }
 }
 
 /***********************************************************************/
